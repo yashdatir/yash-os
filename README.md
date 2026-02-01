@@ -21,7 +21,7 @@ yash-os/
 └── README.md
 
 ------------------------------------------------------------------------
-
+```
 ## Requirements
 
 Make sure the following are installed on your system:
