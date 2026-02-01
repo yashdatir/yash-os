@@ -65,6 +65,5 @@ qemu-system-x86_64 \
   -m "$MEMORY" \
   -nic user,model=virtio-net-pci \
   -drive file="$DISK_IMAGE",format=raw \
-  -nographic
 
 echo "🛑 QEMU exited cleanly"
