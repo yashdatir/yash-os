@@ -52,7 +52,7 @@ filesystem - Launch QEMU
 
 ------------------------------------------------------------------------
 
-### Step 3: Boot the OS from the EXTLINUX prompt
+### Step 3: Boot the OS from the EXTLINUX prompt (for older version)
 
 After QEMU starts, you may see an **EXTLINUX boot\> prompt**.
 

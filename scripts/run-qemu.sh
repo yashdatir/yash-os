@@ -2,68 +2,53 @@
 # Yash OS 1.0 – QEMU Boot Script
 # ==============================
 
-# Source artifacts
-KERNEL_IMAGE="kernel/bzImage"
-ROOTFS_TAR="rootfs/rootfs.tar"
-EXTLINUX_CFG="configs/extlinux.conf"
-
-# Build workspace
-BUILD_DIR="build"
-DISK_IMAGE="$BUILD_DIR/yashos.img"
-MOUNT_DIR="$BUILD_DIR/mounted"
-DISTRO_DIR="$BUILD_DIR/distro"
-
-# Config
-DISK_SIZE="100M"
-MEMORY="4G"
-
 echo
-echo "🐧 Welcome to Yash OS 1.0"
+echo "🐧 Welcome to Yash Datir's OS 1.0"
 echo "--------------------------------------------"
 
-# Sanity checks
-for file in "$KERNEL_IMAGE" "$ROOTFS_TAR" "$EXTLINUX_CFG"; do
-  if [[ ! -f "$file" ]]; then
-    echo "❌ Missing required file: $file"
-    exit 1
-  fi
-done
+#!/bin/bash
+set -e
 
-# Prepare build directory
-mkdir -p "$BUILD_DIR"
+# -------- CONFIG --------
+IMAGE_DIR="$(pwd)/build"
+KERNEL="$IMAGE_DIR/bzImage"
+ROOTFS_TAR="$IMAGE_DIR/rootfs.tar"
+ROOTFS_IMG="$IMAGE_DIR/rootfs.ext4"
+MOUNT_DIR="/tmp/br-rootfs-mnt"
+DISK_SIZE_MB=256
+RAM_MB=128
+# ------------------------
 
-# Cleanup on exit
-cleanup() {
-  sudo umount "$MOUNT_DIR" 2>/dev/null || true
-  rm -rf "$MOUNT_DIR" "$DISTRO_DIR"
-}
-trap cleanup EXIT
+echo "==> Checking files..."
+[ -f "$KERNEL" ] || { echo "bzImage not found"; exit 1; }
+[ -f "$ROOTFS_TAR" ] || { echo "rootfs.tar not found"; exit 1; }
 
-echo "📦 Preparing root filesystem..."
-mkdir -p "$DISTRO_DIR"
-cp "$KERNEL_IMAGE" "$ROOTFS_TAR" "$DISTRO_DIR"
-tar -xf "$ROOTFS_TAR" -C "$DISTRO_DIR"
+# Create rootfs image if not exists
+if [ ! -f "$ROOTFS_IMG" ]; then
+  echo "==> Creating ext4 root filesystem image..."
+  dd if=/dev/zero of="$ROOTFS_IMG" bs=1M count=$DISK_SIZE_MB
+  mkfs.ext4 "$ROOTFS_IMG"
 
-echo "💽 Creating disk image ($DISK_SIZE)..."
-truncate -s "$DISK_SIZE" "$DISK_IMAGE"
-mkfs.ext4 -F "$DISK_IMAGE" > /dev/null
+  mkdir -p "$MOUNT_DIR"
+  sudo mount "$ROOTFS_IMG" "$MOUNT_DIR"
 
-echo "🔧 Installing bootloader (EXTLINUX)..."
-mkdir -p "$MOUNT_DIR"
-sudo mount "$DISK_IMAGE" "$MOUNT_DIR"
+  echo "==> Extracting rootfs..."
+  sudo tar -xf "$ROOTFS_TAR" -C "$MOUNT_DIR"
+  sync
 
-sudo extlinux --install "$MOUNT_DIR"
-sudo mkdir -p "$MOUNT_DIR/extlinux"
-sudo cp "$EXTLINUX_CFG" "$MOUNT_DIR/extlinux/extlinux.conf"
+  sudo umount "$MOUNT_DIR"
+  rmdir "$MOUNT_DIR"
 
-sudo cp -r "$DISTRO_DIR"/* "$MOUNT_DIR"
-sudo umount "$MOUNT_DIR"
+  echo "==> Root filesystem ready"
+else
+  echo "==> Root filesystem image already exists"
+fi
 
-echo "🚀 Booting Yash OS in QEMU..."
+echo "==> Starting QEMU..."
 qemu-system-x86_64 \
-  -enable-kvm \
-  -m "$MEMORY" \
-  -nic user,model=virtio-net-pci \
-  -drive file="$DISK_IMAGE",format=raw \
+  -kernel "$KERNEL" \
+  -drive file="$ROOTFS_IMG",format=raw \
+  -append "root=/dev/sda rw console=tty0 loglevel=8" \
+  -m 1024
 
 echo "🛑 QEMU exited cleanly"
